@@ -1,0 +1,33 @@
+{
+  "name": "FitLife Tracker - ติดตามน้ำหนัก & สุขภาพ",
+  "short_name": "FitLife",
+  "description": "แอปพลิเคชันเพื่อสุขภาพ ลดน้ำหนัก บันทึกน้ำ ดื่มน้ำ เมนูอาหารเช้า และผูกก้าวเดิน Garmin",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F2F2F7",
+  "theme_color": "#007AFF",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "th",
+  "categories": ["fitness", "health", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

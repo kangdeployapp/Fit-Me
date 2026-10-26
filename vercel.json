@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/send-push?type=breakfast",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/send-push?type=water",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/send-push?type=steps",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/send-push?type=motivate",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

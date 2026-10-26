@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 28, 28, 30;
+  --background-start-rgb: 242, 242, 247;
+  --background-end-rgb: 242, 242, 247;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: #f2f2f7;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* iOS Safe Area Inset Support */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 20px);
+}
+
+/* Custom Scrollbar hide for mobile chips */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
