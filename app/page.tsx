@@ -4,72 +4,98 @@ import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   ShieldCheck,
-  ChevronRight,
-  Flame,
-  Utensils,
   User,
+  X,
+  Droplets,
+  Utensils,
+  Footprints,
+  Scale,
+  LayoutDashboard,
 } from "lucide-react";
-import { PushNotificationManager } from "@/components/PushNotificationManager";
-import { WeightTracker } from "@/components/WeightTracker";
-import { WaterTracker } from "@/components/WaterTracker";
-import { GarminModule } from "@/components/GarminModule";
-import { WalkTimer } from "@/components/WalkTimer";
+import { BottomNav, NavCategory } from "@/components/BottomNav";
+import { DashboardView } from "@/components/views/DashboardView";
+import { WaterView } from "@/components/views/WaterView";
 import { BreakfastDirectory } from "@/components/BreakfastDirectory";
+import { StepsView } from "@/components/views/StepsView";
+import { WeightView } from "@/components/views/WeightView";
 import { UserProfileView } from "@/components/UserProfileView";
-import { BottomNav, NavTab } from "@/components/BottomNav";
 import { UserProfile, BreakfastMeal } from "@/types";
 import { DEFAULT_USER_PROFILE } from "@/lib/supabase";
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<NavTab>("overview");
+export default function App() {
+  const [activeCategory, setActiveCategory] = useState<NavCategory>("dashboard");
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [currentBreakfast, setCurrentBreakfast] = useState<BreakfastMeal | null>(null);
+  const [waterMl, setWaterMl] = useState<number>(1500);
+  const [todaySteps, setTodaySteps] = useState<number>(6420);
+  const [currentWeight, setCurrentWeight] = useState<number>(73.0);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
+  // โหลดค่าแคชจาก localStorage
   useEffect(() => {
-    const localProf = localStorage.getItem("fitlife_user_profile");
-    if (localProf) {
+    const prof = localStorage.getItem("fitlife_user_profile");
+    if (prof) {
       try {
-        setUserProfile(JSON.parse(localProf));
+        const parsed = JSON.parse(prof);
+        setUserProfile(parsed);
+        if (parsed.currentWeightKg) setCurrentWeight(parsed.currentWeightKg);
       } catch (e) {}
     }
 
-    const localBf = localStorage.getItem("fitlife_today_breakfast");
-    if (localBf) {
+    const bf = localStorage.getItem("fitlife_today_breakfast");
+    if (bf) {
       try {
-        setCurrentBreakfast(JSON.parse(localBf));
+        setCurrentBreakfast(JSON.parse(bf));
       } catch (e) {}
+    }
+
+    const savedWater = localStorage.getItem("fitlife_today_water");
+    if (savedWater) {
+      setWaterMl(Number(savedWater) || 1500);
     }
   }, []);
+
+  const handleWaterChange = (amount: number) => {
+    setWaterMl(amount);
+    localStorage.setItem("fitlife_today_water", String(amount));
+  };
 
   const todayDateString = new Intl.DateTimeFormat("th-TH", {
     weekday: "long",
     day: "numeric",
     month: "long",
-    year: "numeric",
   }).format(new Date());
 
+  const categoryTitles: Record<NavCategory, { title: string; subtitle: string }> = {
+    dashboard: { title: "ภาพรวมสุขภาพ", subtitle: "สรุปความคืบหน้ารวมประจำวัน" },
+    water: { title: "การดื่มน้ำ", subtitle: "เติมความสดชื่นและกระตุ้นการเผาผลาญ" },
+    breakfast: { title: "เมนูอาหารเช้า", subtitle: "เลือกทานมื้อเช้าสุขภาพดีตามเป้าหมาย" },
+    steps: { title: "ก้าวเดิน & ออกกำลัง", subtitle: "ซิงค์ Garmin และตัวจับเวลาเดิน" },
+    weight: { title: "น้ำหนัก & BMI", subtitle: "บันทึกและติดตามแนวโน้มสู่เป้าหมาย" },
+  };
+
   return (
-    <div className="mx-auto min-h-screen max-w-lg bg-[#F2F2F7] pb-28 text-gray-900">
+    <div className="mx-auto min-h-screen max-w-lg bg-[#F2F2F7] pb-24 text-gray-900">
       {/* iOS Translucent Blur Navigation Header */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-xl border-b border-gray-200/60 px-5 pt-safe pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center space-x-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-600">
-              <Sparkles className="h-3.5 w-3.5" />
+            <div className="flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-600">
+              <Sparkles className="h-3 w-3" />
               <span>FitLife Tracker</span>
+              <span>•</span>
+              <span className="text-gray-400 font-normal">{todayDateString}</span>
             </div>
             <h1 className="text-xl font-black tracking-tight text-gray-900">
-              {activeTab === "overview" && "สุขภาพวันนี้"}
-              {activeTab === "breakfast" && "เมนูอาหารเช้า"}
-              {activeTab === "profile" && "ข้อมูลส่วนตัว & เป้าหมาย"}
+              {categoryTitles[activeCategory].title}
             </h1>
           </div>
 
-          {/* Avatar Shortcut to Profile Tab */}
+          {/* ปุ่มโปรไฟล์ผู้ใช้ */}
           <button
-            onClick={() => setActiveTab("profile")}
+            onClick={() => setIsProfileModalOpen(true)}
             className="flex items-center space-x-2 rounded-full bg-gray-100 p-1 pr-3 hover:bg-gray-200 active:scale-95 transition"
-            title="ไปที่หน้าโปรไฟล์"
+            title="จัดการโปรไฟล์ส่วนตัว & เป้าหมาย"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-sm">
               {userProfile.nickname ? userProfile.nickname[0].toUpperCase() : "U"}
@@ -79,108 +105,79 @@ export default function Dashboard() {
             </span>
           </button>
         </div>
-        <p className="mt-0.5 text-xs text-gray-500">{todayDateString}</p>
       </header>
 
-      {/* Main Tab Content */}
-      <main className="p-4 space-y-4">
-        {/* TAB 1: OVERVIEW (หน้าหลัก) */}
-        {activeTab === "overview" && (
-          <>
-            {/* 1. Web Push Notification Manager */}
-            <section>
-              <PushNotificationManager />
-            </section>
-
-            {/* 2. Garmin Connect Module & Steps */}
-            <section>
-              <GarminModule />
-            </section>
-
-            {/* 3. Weight Log & BMI Interactive Chart */}
-            <section>
-              <WeightTracker />
-            </section>
-
-            {/* 4. Quick Breakfast Card (กดแล้วสลับไป Tab เมนูอาหารเช้าได้ทันที) */}
-            <section>
-              <div className="rounded-3xl bg-white p-5 shadow-ios border border-gray-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
-                      <Utensils className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-gray-900">อาหารเช้าวันนี้</h3>
-                      <p className="text-xs text-gray-500">
-                        {currentBreakfast
-                          ? `${currentBreakfast.name} (${currentBreakfast.kcal} kcal)`
-                          : "ยังไม่ได้เลือกเมนูมื้อเช้า"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setActiveTab("breakfast")}
-                    className="flex items-center space-x-1 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-600 hover:bg-orange-100 active:scale-95 transition"
-                  >
-                    <span>เลือกเมนู</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {currentBreakfast && (
-                  <div className="mt-3.5 rounded-2xl bg-orange-50/60 p-3 border border-orange-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-2xl">{currentBreakfast.icon}</span>
-                      <div>
-                        <span className="font-bold text-gray-900 block line-clamp-1">
-                          {currentBreakfast.name}
-                        </span>
-                        <span className="text-[11px] text-gray-500">
-                          โปรตีน {currentBreakfast.proteinG}g • คาร์บ {currentBreakfast.carbsG}g
-                        </span>
-                      </div>
-                    </div>
-                    <span className="font-bold text-orange-600">{currentBreakfast.kcal} kcal</span>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* 5. Water Intake Tracker */}
-            <section>
-              <WaterTracker />
-            </section>
-
-            {/* 6. Walking Countdown Timer */}
-            <section>
-              <WalkTimer />
-            </section>
-          </>
+      {/* Main Category Content */}
+      <main className="p-4">
+        {/* 1. หมวด Dashboard */}
+        {activeCategory === "dashboard" && (
+          <DashboardView
+            userProfile={userProfile}
+            currentBreakfast={currentBreakfast}
+            waterMl={waterMl}
+            todaySteps={todaySteps}
+            currentWeight={currentWeight}
+            onChangeCategory={(cat) => setActiveCategory(cat)}
+          />
         )}
 
-        {/* TAB 2: BREAKFAST DIRECTORY (หน้ารวมเมนูอาหารเช้าแบ่งหมวดหมู่แบบเต็ม) */}
-        {activeTab === "breakfast" && (
-          <section>
-            <BreakfastDirectory
-              onMealSelected={(meal) => setCurrentBreakfast(meal)}
-            />
-          </section>
+        {/* 2. หมวด การดื่มน้ำ */}
+        {activeCategory === "water" && (
+          <WaterView
+            userProfile={userProfile}
+            waterMl={waterMl}
+            onWaterChange={handleWaterChange}
+          />
         )}
 
-        {/* TAB 3: USER PROFILE (หน้าบันทึกข้อมูลพื้นฐาน BMR & TDEE) */}
-        {activeTab === "profile" && (
-          <section>
-            <UserProfileView
-              onProfileUpdated={(updated) => setUserProfile(updated)}
-            />
-          </section>
+        {/* 3. หมวด อาหารเช้า */}
+        {activeCategory === "breakfast" && (
+          <BreakfastDirectory
+            onMealSelected={(meal) => setCurrentBreakfast(meal)}
+          />
+        )}
+
+        {/* 4. หมวด ก้าวเดิน */}
+        {activeCategory === "steps" && (
+          <StepsView userProfile={userProfile} />
+        )}
+
+        {/* 5. หมวด น้ำหนัก */}
+        {activeCategory === "weight" && (
+          <WeightView userProfile={userProfile} />
         )}
       </main>
 
-      {/* iOS Floating Bottom Tab Bar */}
-      <BottomNav activeTab={activeTab} onChangeTab={(tab) => setActiveTab(tab)} />
+      {/* Profile Modal */}
+      {isProfileModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto animate-in fade-in slide-in-from-bottom-6">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="text-base font-bold text-gray-900">ข้อมูลส่วนตัว & การเผาผลาญ</h3>
+              <button
+                onClick={() => setIsProfileModalOpen(false)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4">
+              <UserProfileView
+                onProfileUpdated={(updated) => {
+                  setUserProfile(updated);
+                  if (updated.currentWeightKg) setCurrentWeight(updated.currentWeightKg);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* iOS Floating Bottom Bar Navigation */}
+      <BottomNav
+        activeCategory={activeCategory}
+        onChangeCategory={(cat) => setActiveCategory(cat)}
+      />
     </div>
   );
 }
