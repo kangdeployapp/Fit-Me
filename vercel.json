@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/send-push?type=motivate",
-      "schedule": "0 1 * * *"
+      "path": "/api/cron/smart-alert",
+      "schedule": "*/30 0-16 * * *"
     }
   ]
 }

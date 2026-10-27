@@ -61,17 +61,13 @@ export function StepsView({ userProfile }: StepsViewProps) {
       {/* 3. Steps Encouragement Banner */}
       <div className="rounded-3xl bg-purple-50 p-4 border border-purple-100 flex items-center justify-between">
         <div>
-          <h4 className="text-xs font-bold text-purple-900">นั่งนานเกิน 1 ชั่วโมงหรือยัง?</h4>
-          <p className="text-[11px] text-purple-700">ลุกขึ้นมาเดินยืดเส้นยืดสาย 5 นาที ช่วยเพิ่มอัตราเผาผลาญ</p>
+          <h4 className="text-xs font-bold text-purple-900">ระบบคอยกระตุ้นก้าวเดินอัตโนมัติ</h4>
+          <p className="text-[11px] text-purple-700">เมื่อนั่งนานหรือก้าวเดินยังไม่ถึงเกณฑ์ยามเย็น ระบบจะแจ้งเตือนให้อัตโนมัติ</p>
         </div>
-        <button
-          onClick={handleSendStepsPush}
-          disabled={isSendingPush}
-          className="rounded-full bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-purple-700 active:scale-95 transition disabled:opacity-50 flex-shrink-0"
-        >
-          <BellRing className="h-3.5 w-3.5 inline-block mr-1" />
-          <span>{isSendingPush ? "กำลังส่ง..." : "ยิงเตือนลุกเดิน"}</span>
-        </button>
+        <span className="rounded-full bg-purple-200/80 px-3 py-1 text-[10px] font-bold text-purple-800 flex items-center space-x-1 flex-shrink-0">
+          <span className="h-2 w-2 rounded-full bg-purple-600 animate-ping" />
+          <span>ติดตามอัตโนมัติ</span>
+        </span>
       </div>
     </div>
   );

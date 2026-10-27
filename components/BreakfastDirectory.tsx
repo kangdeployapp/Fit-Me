@@ -13,10 +13,13 @@ import {
   ChevronRight,
   X,
   Filter,
+  Bot,
+  RefreshCw,
 } from "lucide-react";
 import { BreakfastMeal, MealCategory } from "@/types";
 import { ALL_BREAKFAST_MEALS, BREAKFAST_CATEGORIES, CategoryInfo } from "@/data/breakfastMeals";
 import { supabase } from "@/lib/supabase";
+import { AIBreakfastChef } from "@/components/AIBreakfastChef";
 
 interface BreakfastDirectoryProps {
   onMealSelected?: (meal: BreakfastMeal) => void;
@@ -28,9 +31,11 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
   const [todayLoggedMeal, setTodayLoggedMeal] = useState<BreakfastMeal | null>(null);
   const [inspectingMeal, setInspectingMeal] = useState<BreakfastMeal | null>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // ข้อมูลเมนูที่ผู้ใช้สร้างเอง
+  // เมนูจากฐานข้อมูล Supabase และ Custom
+  const [dbMeals, setDbMeals] = useState<BreakfastMeal[]>([]);
   const [customMeals, setCustomMeals] = useState<BreakfastMeal[]>([]);
   const [customForm, setCustomForm] = useState({
     name: "",
@@ -40,7 +45,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
     fatG: "",
   });
 
-  // โหลดมื้อที่บันทึกไว้ใน localStorage / Supabase
+  // โหลดมื้อที่บันทึกไว้ใน localStorage & ดึงสูตรจาก Supabase
   useEffect(() => {
     const savedMealJson = localStorage.getItem("fitlife_today_breakfast");
     if (savedMealJson) {
@@ -57,18 +62,63 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
         setCustomMeals(JSON.parse(savedCustoms));
       } catch (e) {}
     }
+
+    fetchRecipesFromSupabase();
   }, []);
+
+  // ดึงเมนูอาหารเช้าจากฐานข้อมูล Supabase table `breakfast_recipes`
+  const fetchRecipesFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("breakfast_recipes")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (data && !error && data.length > 0) {
+        const mapped: BreakfastMeal[] = data.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          category: r.category as MealCategory,
+          categoryLabel: r.category_label || "อาหารเช้า",
+          icon: r.icon || "🍽️",
+          kcal: r.kcal,
+          proteinG: Number(r.protein_g) || 0,
+          carbsG: Number(r.carbs_g) || 0,
+          fatG: Number(r.fat_g) || 0,
+          fiberG: Number(r.fiber_g) || 0,
+          tags: [r.category_label || "สุขภาพ"],
+          description: r.description || "",
+          cookingTimeMinutes: r.cooking_time_minutes || 5,
+          difficulty: (r.difficulty as any) || "ง่าย",
+          highlights: r.is_ai_generated
+            ? ["สูตรคิดค้นโดย AI Chef", "สารอาหารครบถ้วน"]
+            : ["อุดมด้วยสารอาหารคุณภาพ", "อิ่มสบายท้อง"],
+        }));
+        setDbMeals(mapped);
+      }
+    } catch (err) {
+      console.warn("Fetch breakfast recipes from Supabase failed:", err);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // รวมเมนูเริ่มต้น + เมนูที่ผู้ใช้สร้างเอง
-  const combinedMeals = [...customMeals, ...ALL_BREAKFAST_MEALS];
+  // รวมเมนูเริ่มต้น + เมนูจาก Supabase + เมนูที่สร้างเอง
+  const allAvailableMeals = [
+    ...customMeals,
+    ...(dbMeals.length > 0 ? dbMeals : ALL_BREAKFAST_MEALS),
+  ];
+
+  // กรองเมนูซ้ำตามชื่อ
+  const uniqueMeals = allAvailableMeals.filter(
+    (meal, index, self) => index === self.findIndex((m) => m.name === meal.name)
+  );
 
   // คัดกรองตามหมวดหมู่และการค้นหา
-  const filteredMeals = combinedMeals.filter((meal) => {
+  const filteredMeals = uniqueMeals.filter((meal) => {
     const matchesCategory = selectedCategory === "all" || meal.category === selectedCategory;
     const q = searchQuery.trim().toLowerCase();
     const matchesQuery =
@@ -104,7 +154,6 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
     }
   };
 
-  // บันทึกเมนูอาหารใหม่ที่ผู้ใช้กำหนดเอง
   const handleCreateCustomMeal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customForm.name || !customForm.kcal) return;
@@ -197,7 +246,34 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
         </div>
       )}
 
-      {/* ช่องค้นหา & ปุ่มเพิ่มเมนูของฉัน */}
+      {/* AI Breakfast Chef Banner Button (ผูกกับ AI Agent) */}
+      <div className="rounded-3xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-4 text-white shadow-md flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md">
+            <Bot className="h-5 w-5 text-amber-300" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-1">
+              <h4 className="text-sm font-bold">FitLife AI Chef & Nutritionist</h4>
+              <span className="rounded-full bg-amber-400 text-purple-900 px-1.5 py-0.2 text-[9px] font-black uppercase">
+                AI Agent
+              </span>
+            </div>
+            <p className="text-xs text-purple-100">
+              คิดเมนูจากของในตู้เย็น • วิเคราะห์อาหารที่ทาน • เมนูตามเป้าหมาย
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIsAiModalOpen(true)}
+          className="rounded-full bg-white px-3.5 py-2 text-xs font-bold text-purple-700 shadow hover:bg-purple-50 active:scale-95 transition flex-shrink-0"
+        >
+          เปิด AI Chef
+        </button>
+      </div>
+
+      {/* ช่องค้นหา & ปุ่มเพิ่มเมนู */}
       <div className="flex items-center space-x-2">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
@@ -237,7 +313,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
               : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
           }`}
         >
-          <span>🍽️ ทั้งหมด ({combinedMeals.length})</span>
+          <span>🍽️ ทั้งหมด ({uniqueMeals.length})</span>
         </button>
 
         {BREAKFAST_CATEGORIES.map((cat) => {
@@ -259,20 +335,6 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
         })}
       </div>
 
-      {/* ข้อมูลหมวดหมู่ที่เลือก (Category Description banner) */}
-      {selectedCategory !== "all" && (
-        <div className="rounded-2xl bg-white p-3 border border-gray-100 shadow-sm text-xs">
-          {BREAKFAST_CATEGORIES.filter((c) => c.id === selectedCategory).map((c) => (
-            <div key={c.id} className="flex items-center space-x-2 text-gray-600">
-              <span className="text-base">{c.icon}</span>
-              <span>
-                <strong className={c.color}>{c.name}:</strong> {c.description}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* รายการเมนูอาหารทั้งหมด (Menu Cards Grid) */}
       <div className="space-y-3">
         {filteredMeals.length === 0 ? (
@@ -280,7 +342,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
             <span className="text-4xl">🔍</span>
             <p className="mt-2 text-sm font-semibold text-gray-700">ไม่พบเมนูที่คุณค้นหา</p>
             <p className="text-xs text-gray-400 mt-1">
-              ลองค้นหาด้วยคำอื่น หรือกดปุ่ม &ldquo;+ เพิ่มเมนู&rdquo; ด้านบนได้เลยครับ
+              ลองใช้ปุ่ม &ldquo;เปิด AI Chef&rdquo; ด้านบน เพื่อให้ AI ช่วยคิดเมนูได้เลยครับ!
             </p>
           </div>
         ) : (
@@ -374,7 +436,20 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
         )}
       </div>
 
-      {/* Modal Sheet แสดงข้อมูลโภชนาการแบบละเอียด (Nutrition Inspection Modal) */}
+      {/* AI Breakfast Chef Modal */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <AIBreakfastChef
+            onMealGeneratedAndSelected={(meal) => {
+              handleSelectMeal(meal);
+              fetchRecipesFromSupabase();
+            }}
+            onClose={() => setIsAiModalOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Nutrition Modal Sheet */}
       {inspectingMeal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-6">
@@ -432,19 +507,6 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
               </div>
             </div>
 
-            {/* จุดเด่น & เคล็ดลับสุขภาพ */}
-            <div className="mt-4 rounded-2xl bg-gray-50 p-3 text-xs">
-              <span className="font-bold text-gray-800">จุดเด่นของเมนูนี้:</span>
-              <ul className="mt-1 space-y-1 text-gray-600">
-                {inspectingMeal.highlights.map((h, i) => (
-                  <li key={i} className="flex items-center space-x-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-                    <span>{h}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
             <div className="mt-5 flex space-x-3">
               <button
                 onClick={() => {
@@ -460,7 +522,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
         </div>
       )}
 
-      {/* Modal สำหรับสร้างเมนูอาหารเช้าด้วยตัวเอง */}
+      {/* Custom Meal Modal */}
       {isCustomModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in">
@@ -504,30 +566,6 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
                     placeholder="20"
                     value={customForm.proteinG}
                     onChange={(e) => setCustomForm({ ...customForm, proteinG: e.target.value })}
-                    className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600">คาร์โบไฮเดรต (g)</label>
-                  <input
-                    type="number"
-                    placeholder="15"
-                    value={customForm.carbsG}
-                    onChange={(e) => setCustomForm({ ...customForm, carbsG: e.target.value })}
-                    className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-gray-600">ไขมัน (g)</label>
-                  <input
-                    type="number"
-                    placeholder="6"
-                    value={customForm.fatG}
-                    onChange={(e) => setCustomForm({ ...customForm, fatG: e.target.value })}
                     className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-orange-500"
                   />
                 </div>

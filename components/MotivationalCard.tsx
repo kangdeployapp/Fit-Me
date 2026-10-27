@@ -1,13 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, RefreshCw, Send, BellRing, HeartHandshake, CheckCircle } from "lucide-react";
+import { Sparkles, RefreshCw, ShieldCheck, HeartHandshake } from "lucide-react";
 import { MotivationalQuote, getRandomQuote, MOTIVATIONAL_QUOTES } from "@/data/motivationalQuotes";
 
 export function MotivationalCard() {
   const [currentQuote, setCurrentQuote] = useState<MotivationalQuote>(() => getRandomQuote());
-  const [isSending, setIsSending] = useState(false);
-  const [sentSuccess, setSentSuccess] = useState(false);
 
   const handleShuffle = () => {
     let next = getRandomQuote();
@@ -15,30 +13,6 @@ export function MotivationalCard() {
       next = getRandomQuote();
     }
     setCurrentQuote(next);
-  };
-
-  const handleSendPush = async () => {
-    setIsSending(true);
-    setSentSuccess(false);
-    try {
-      const res = await fetch("/api/send-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: currentQuote.title,
-          body: currentQuote.body,
-          url: "/",
-        }),
-      });
-      if (res.ok) {
-        setSentSuccess(true);
-        setTimeout(() => setSentSuccess(false), 3000);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSending(false);
-    }
   };
 
   return (
@@ -76,30 +50,17 @@ export function MotivationalCard() {
           </p>
         </div>
 
-        {/* Action button to test sending this motivation to iPhone */}
-        <div className="mt-4 flex items-center justify-between border-t border-white/20 pt-3">
-          <span className="text-[10px] text-rose-100 flex items-center space-x-1">
+        {/* ระบบแจ้งเตือนอัตโนมัติทำงานในพื้นหลัง (ไม่ต้องกดส่งเอง) */}
+        <div className="mt-4 flex items-center justify-between border-t border-white/20 pt-3 text-[11px]">
+          <span className="text-rose-100 flex items-center space-x-1">
             <HeartHandshake className="h-3.5 w-3.5" />
-            <span>FitLife ขอเป็นพลังใจให้คุณในทุกวัน</span>
+            <span>FitLife ส่งพลังบวกให้คุณทุกวัน</span>
           </span>
 
-          <button
-            onClick={handleSendPush}
-            disabled={isSending}
-            className="flex items-center space-x-1.5 rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-rose-600 shadow-md hover:bg-rose-50 active:scale-95 transition disabled:opacity-50"
-          >
-            {sentSuccess ? (
-              <>
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="text-emerald-700">ส่งแจ้งเตือนแล้ว!</span>
-              </>
-            ) : (
-              <>
-                <BellRing className="h-3.5 w-3.5" />
-                <span>{isSending ? "กำลังส่ง..." : "ส่งเข้าแจ้งเตือน"}</span>
-              </>
-            )}
-          </button>
+          <span className="inline-flex items-center space-x-1 rounded-full bg-white/20 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-ping" />
+            <span>ระบบแจ้งเตือนอัตโนมัติทำงานอยู่</span>
+          </span>
         </div>
       </div>
     </div>

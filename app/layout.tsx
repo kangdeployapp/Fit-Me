@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { IOSInstallPrompt } from "@/components/iOSInstallPrompt";
+import { AutoNotificationWatcher } from "@/components/AutoNotificationWatcher";
 
 export const metadata: Metadata = {
   title: "FitLife Tracker - ติดตามน้ำหนัก & สุขภาพ",
@@ -51,6 +52,7 @@ export default function RootLayout({
       <body className="min-h-full font-sans antialiased text-gray-900 pb-safe selection:bg-blue-100">
         {children}
         <IOSInstallPrompt />
+        <AutoNotificationWatcher />
       </body>
     </html>
   );

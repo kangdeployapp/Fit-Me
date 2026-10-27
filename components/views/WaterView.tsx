@@ -158,15 +158,11 @@ export function WaterView({ userProfile, waterMl, onWaterChange }: WaterViewProp
               <strong className="text-cyan-700">{recommendedMl.toLocaleString()} มล./วัน</strong>
             </div>
 
-            {/* ปุ่มส่งแจ้งเตือนเตือนดื่มน้ำเข้ามือถือ */}
-            <button
-              onClick={handleSendWaterPush}
-              disabled={isSendingPush}
-              className="mt-4 flex items-center space-x-1.5 rounded-full bg-cyan-50 px-3.5 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-100 active:scale-95 transition disabled:opacity-50"
-            >
-              <BellRing className="h-3.5 w-3.5" />
-              <span>{isSendingPush ? "กำลังส่ง..." : "ยิงเตือนดื่มน้ำเข้า iPhone"}</span>
-            </button>
+            {/* ระบบติดตามและแจ้งเตือนอัตโนมัติ */}
+            <div className="mt-4 flex items-center space-x-1.5 text-[11px] font-semibold text-cyan-800 bg-cyan-50/80 px-3 py-1.5 rounded-full border border-cyan-100/60">
+              <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
+              <span>ระบบคอยเตือนดื่มน้ำอัตโนมัติเมื่อถึงช่วงเวลา</span>
+            </div>
           </div>
         </div>
 
