@@ -30,10 +30,67 @@ export default function App() {
   const [todaySteps, setTodaySteps] = useState<number>(7450);
   const [currentWeight, setCurrentWeight] = useState<number>(83.0);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [realtimeToast, setRealtimeToast] = useState<string | null>(null);
 
-  // ดึงข้อมูลจริงล่าสุดจาก Supabase ทันทีเมื่อเปิดแอป
+  // ดึงข้อมูลจริงล่าสุดจาก Supabase และเปิดระบบ Real-time Sync 100%
   useEffect(() => {
     fetchLiveSupabaseData();
+
+    // 1. Re-fetch ทันทีเมื่อผู้ใช้สลับหน้าจอกลับมาที่แอป (Window Focus / Visibility Change)
+    const handleReFocus = () => {
+      fetchLiveSupabaseData();
+    };
+
+    window.addEventListener("focus", handleReFocus);
+    document.addEventListener("visibilitychange", handleReFocus);
+
+    // 2. ตรวจสอบข้อมูลอัปเดตอัตโนมัติทุก 20 วินาทีขณะเปิดแอปค้างไว้
+    const intervalTimer = setInterval(() => {
+      fetchLiveSupabaseData();
+    }, 20000);
+
+    // 3. Supabase Realtime Subscription: ดักฟังการเปลี่ยนแปลงจาก iOS Shortcut ทันทีแบบวินาทีต่อวินาที
+    const todayStr = new Date().toISOString().split("T")[0];
+    const channel = supabase
+      .channel("fitlife_live_data_feed")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "daily_habits" },
+        (payload: any) => {
+          if (payload.new && payload.new.date === todayStr) {
+            if (payload.new.steps !== undefined && payload.new.steps !== null) {
+              setTodaySteps(payload.new.steps);
+              setRealtimeToast(`⚡ ซิงค์ก้าวเดินจริงจาก Apple Health Real-time: ${payload.new.steps.toLocaleString()} ก้าว`);
+              setTimeout(() => setRealtimeToast(null), 3500);
+            }
+            if (payload.new.water_ml !== undefined && payload.new.water_ml !== null) {
+              setWaterMl(payload.new.water_ml);
+            }
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "user_profiles" },
+        (payload: any) => {
+          if (payload.new) {
+            if (payload.new.current_weight_kg) {
+              setCurrentWeight(Number(payload.new.current_weight_kg));
+            }
+            if (payload.new.fitness_age) {
+              setUserProfile((prev) => ({ ...prev, fitnessAge: payload.new.fitness_age }));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener("focus", handleReFocus);
+      document.removeEventListener("visibilitychange", handleReFocus);
+      clearInterval(intervalTimer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchLiveSupabaseData = async () => {
@@ -157,6 +214,14 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Real-time Webhook / iOS Shortcut Alert Toast */}
+      {realtimeToast && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-xl flex items-center space-x-2 animate-bounce border border-white/30">
+          <Sparkles className="h-4 w-4 text-amber-300" />
+          <span>{realtimeToast}</span>
+        </div>
+      )}
 
       {/* Main Category Content */}
       <main className="p-4">

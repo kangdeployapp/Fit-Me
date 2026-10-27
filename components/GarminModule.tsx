@@ -476,15 +476,13 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
             ) : (
               /* Tab 2: Apple Health & Shortcuts Guide */
               <div className="mt-4 space-y-4 text-xs text-gray-700">
-                <div className="rounded-2xl bg-blue-50/80 p-3.5 border border-blue-100 text-blue-950">
-                  <h4 className="font-bold flex items-center space-x-1 mb-1">
-                    <Smartphone className="h-4 w-4 text-blue-600" />
-                    <span>ทำไมต้องผ่าน Apple Health บน iPhone?</span>
+                <div className="rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 p-3.5 border border-purple-100 text-purple-950">
+                  <h4 className="font-bold flex items-center space-x-1 mb-1 text-purple-900">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <span>เคล็ดลับซิงค์ Real-Time 100% อัตโนมัติ:</span>
                   </h4>
-                  <p className="text-[11px] leading-relaxed">
-                    เนื่องจากระบบความปลอดภัยของ iOS บน iPhone ไม่อนุญาตให้เบราว์เซอร์หรือเว็บแอปคุยกับบลูทูธของนาฬิกาโดยตรง ทางการทำงานจริงของ Garmin บน iPhone คือ:
-                    <br />
-                    <strong>Garmin Instinct 2 → แอป Garmin Connect → Apple Health (สุขภาพ)</strong>
+                  <p className="text-[11px] leading-relaxed text-purple-800">
+                    ตั้งค่าให้คำสั่งลัดทำงานอัตโนมัติ <strong>"เมื่อเปิดแอป FitLife"</strong> หรือ <strong>"เมื่อเปิดแอป Garmin Connect"</strong> ทุกครั้งที่คุณหยิบ iPhone ขึ้นมาใช้งาน ข้อมูลก้าวเดินจริงจะถูกส่งเข้า Supabase ทันทีโดยไม่ต้องกดอะไรเลยครับ!
                   </p>
                 </div>
 
@@ -494,9 +492,9 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
                       1
                     </span>
                     <div>
-                      <p className="font-bold text-gray-900">เปิดการเชื่อมต่อ Apple Health ใน Garmin Connect</p>
+                      <p className="font-bold text-gray-900">เปิดแอป "คำสั่งลัด (Shortcuts)" บน iPhone</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        ในแอป Garmin Connect บน iPhone ไปที่ <em>เพิ่มเติม (More) &gt; การตั้งค่า (Settings) &gt; แอปที่เชื่อมต่อ (Connected Apps) &gt; Apple Health</em> และเปิดสิทธิ์อ่าน/เขียน "จำนวนก้าว"
+                        แตะแท็บ <strong>"การทำงานอัตโนมัติ (Automation)"</strong> ด้านล่าง &gt; แตะเครื่องหมาย <strong>+ (สร้างใหม่)</strong>
                       </p>
                     </div>
                   </div>
@@ -506,16 +504,30 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
                       2
                     </span>
                     <div>
-                      <p className="font-bold text-gray-900">ส่งข้อมูลอัตโนมัติด้วยคำสั่งลัด (Shortcuts)</p>
+                      <p className="font-bold text-gray-900">เลือกเงื่อนไข "แอป (App)"</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        ในแอป "คำสั่งลัด" (Shortcuts) บน iPhone สร้างคำสั่งลัดตั้งเวลาทำงานทุกวัน (เช่น 20:00 น.) สั่งให้ <strong>"ดึงจำนวนก้าวจากแอปสุขภาพ"</strong> แล้วยิง POST มาที่ Webhook ด้านล่าง
+                        เลือกแอป <strong>"FitLife"</strong> หรือ <strong>"Garmin Connect"</strong> &gt; ติ๊ก <strong>"เปิดอยู่ (Is Opened)"</strong> &gt; เลือก <strong>"ทำงานทันที (Run Immediately)"</strong> และปิดการถามก่อนสั่งการ
                       </p>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-gray-50 p-3 border border-gray-200">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="font-bold text-[11px] text-gray-600">FitLife Webhook URL:</span>
+                  <div className="flex items-start space-x-2.5">
+                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 font-bold text-[10px]">
+                      3
+                    </span>
+                    <div>
+                      <p className="font-bold text-gray-900">เพิ่ม 2 คำสั่ง (Action)</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        • <strong>ค้นหาตัวอย่างสุขภาพ (Find Health):</strong> เลือก "จำนวนก้าว" ของ "วันนี้" นำมา "รวม (Sum)"
+                        <br />
+                        • <strong>ดึงเนื้อหาจาก URL (Get Contents of URL):</strong> ใส่ URL ด้านล่างนี้
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gray-50 p-3.5 border border-gray-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[11px] text-gray-700">URL สำหรับคำสั่งลัด (แตะคัดลอกได้เลย):</span>
                       <button
                         onClick={handleCopyWebhookUrl}
                         className="flex items-center space-x-1 text-purple-600 font-bold text-[11px] hover:underline"
@@ -533,18 +545,35 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
                         )}
                       </button>
                     </div>
-                    <code className="text-[10px] bg-white p-2 rounded-xl border border-gray-200 block overflow-x-auto text-purple-800 font-mono font-bold">
-                      {liveOrigin ? `${liveOrigin}/api/garmin` : "https://<โดเมน-Vercel-ของคุณ>/api/garmin"}
-                    </code>
-                    <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">
-                      💡 <strong>วิธีตั้งค่าง่ายที่สุด:</strong> ในแอปคำสั่งลัด เลือกคำสั่ง <em>"ดึงเนื้อหาจาก URL"</em> แล้วใส่ URL:
-                      <br />
-                      <code className="text-purple-700 bg-white px-1.5 py-0.5 rounded border border-gray-200 mt-0.5 inline-block">
-                        {liveOrigin ? `${liveOrigin}/api/garmin?steps=` : "https://<โดเมน-Vercel-ของคุณ>/api/garmin?steps="}[จำนวนก้าว]
+
+                    <div className="bg-white p-2.5 rounded-xl border border-gray-200">
+                      <p className="text-[10px] text-gray-400 mb-0.5">ใส่ในช่อง URL ของคำสั่งลัด:</p>
+                      <code className="text-[10px] text-purple-800 font-mono font-bold break-all block">
+                        {liveOrigin ? `${liveOrigin}/api/garmin?steps=` : "https://<โดเมน-เว็บของคุณ>/api/garmin?steps="}[จำนวนก้าว]
                       </code>
+                    </div>
+
+                    <p className="text-[10px] text-gray-400">
+                      * [จำนวนก้าว] ให้แตะแป้นพิมพ์บน iPhone แล้วเลือกตัวแปร <strong>"ค่า (Value / Sum)"</strong> จากคำสั่งค้นหาตัวอย่างสุขภาพ
                     </p>
                   </div>
                 </div>
+
+                {/* ปุ่มทดสอบ Real-time Sync */}
+                <button
+                  onClick={async () => {
+                    const testSteps = todaySteps + 10;
+                    await fetch(`/api/garmin?steps=${testSteps}&fitnessAge=${fitnessAge}`);
+                    setTodaySteps(testSteps);
+                    if (onStepsUpdate) onStepsUpdate(testSteps, fitnessAge);
+                    setToastMessage(`⚡ ทดสอบส่ง Real-time สำเร็จ! (${testSteps.toLocaleString()} ก้าว)`);
+                    setTimeout(() => setToastMessage(null), 3500);
+                  }}
+                  className="w-full rounded-2xl bg-emerald-50 border border-emerald-200 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition flex items-center justify-center space-x-1.5"
+                >
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                  <span>🧪 กดเพื่อทดสอบ Real-time Sync เข้า Supabase ทันที</span>
+                </button>
 
                 <button
                   onClick={() => setModalTab("manual")}
