@@ -36,6 +36,8 @@ export type DailyHabit = {
   water_ml: number;
   breakfast_meal: string | null;
   breakfast_kcal: number;
+  fitness_age?: number | null;
+  resting_hr?: number | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -51,4 +53,7 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   dailyKcalTarget: 1650,
   dailyWaterMl: 2500,
   dailyStepGoal: 10000,
+  garminConnected: false,
+  garminDevice: "Garmin Forerunner 265",
+  fitnessAge: 25,
 };

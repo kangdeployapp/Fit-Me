@@ -19,6 +19,11 @@ export interface UserProfile {
   dailyKcalTarget: number;
   dailyWaterMl: number;
   dailyStepGoal: number;
+  garminConnected?: boolean;
+  garminDevice?: string;
+  garminLastSync?: string;
+  fitnessAge?: number; // อายุสุขภาพจาก Garmin
+  restingHr?: number;  // อัตราการเต้นของหัวใจขณะพัก
   updatedAt?: string;
 }
 

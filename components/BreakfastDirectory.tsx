@@ -15,6 +15,9 @@ import {
   Filter,
   Bot,
   RefreshCw,
+  Loader2,
+  Database,
+  ArrowRight,
 } from "lucide-react";
 import { BreakfastMeal, MealCategory } from "@/types";
 import { ALL_BREAKFAST_MEALS, BREAKFAST_CATEGORIES, CategoryInfo } from "@/data/breakfastMeals";
@@ -37,6 +40,8 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
   // เมนูจากฐานข้อมูล Supabase และ Custom
   const [dbMeals, setDbMeals] = useState<BreakfastMeal[]>([]);
   const [customMeals, setCustomMeals] = useState<BreakfastMeal[]>([]);
+  const [quickAiInput, setQuickAiInput] = useState("");
+  const [isQuickAiLoading, setIsQuickAiLoading] = useState(false);
   const [customForm, setCustomForm] = useState({
     name: "",
     kcal: "",
@@ -103,7 +108,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // รวมเมนูเริ่มต้น + เมนูจาก Supabase + เมนูที่สร้างเอง
@@ -130,7 +135,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
     return matchesCategory && matchesQuery;
   });
 
-  // ฟังก์ชันเลือกและบันทึกมื้ออาหารเช้า
+  // ฟังก์ชันเลือกและบันทึกมื้ออาหารเช้าลง Supabase
   const handleSelectMeal = async (meal: BreakfastMeal) => {
     setTodayLoggedMeal(meal);
     localStorage.setItem("fitlife_today_breakfast", JSON.stringify(meal));
@@ -138,7 +143,6 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
 
     showToast(`บันทึก "${meal.name}" เป็นมื้อเช้าเรียบร้อยแล้ว!`);
 
-    // บันทึกลง Supabase daily_habits
     try {
       await supabase.from("daily_habits").upsert(
         {
@@ -151,6 +155,53 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
       );
     } catch (err) {
       console.warn("Supabase habit update:", err);
+    }
+  };
+
+  // ฟังก์ชันให้ AI ดึงข้อมูลอาหารเช้าอัตโนมัติ (เช่น กรอก "ข้าวต้มหมู" -> AI ดึงสารอาหารให้ทันที)
+  const handleQuickAiLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = quickAiInput.trim();
+    if (!name) return;
+
+    setIsQuickAiLoading(true);
+    try {
+      const res = await fetch("/api/ai-breakfast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "analyze_meal", mealName: name }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.meal) {
+        const meal: BreakfastMeal = {
+          id: `ai-${Date.now()}`,
+          name: data.meal.name,
+          category: data.meal.category || "low_calorie",
+          categoryLabel: data.meal.categoryLabel || "AI วิเคราะห์สารอาหาร",
+          icon: data.meal.icon || "🥣",
+          kcal: data.meal.kcal,
+          proteinG: data.meal.proteinG,
+          carbsG: data.meal.carbsG,
+          fatG: data.meal.fatG,
+          fiberG: data.meal.fiberG || 2,
+          tags: ["AI วิเคราะห์", "สารอาหารจริง"],
+          description: data.meal.description,
+          cookingTimeMinutes: data.meal.cookingTimeMinutes || 5,
+          difficulty: data.meal.difficulty || "ง่าย",
+          highlights: data.meal.highlights || ["คำนวณสารอาหารโดย AI", "บันทึกเข้า Supabase แล้ว"],
+        };
+
+        // บันทึกและเลือกทานมื้อนี้ทันที
+        await handleSelectMeal(meal);
+        setQuickAiInput("");
+        await fetchRecipesFromSupabase();
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert("AI ดึงข้อมูลไม่สำเร็จ: " + err.message);
+    } finally {
+      setIsQuickAiLoading(false);
     }
   };
 
@@ -246,7 +297,44 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
         </div>
       )}
 
-      {/* AI Breakfast Chef Banner Button (ผูกกับ AI Agent) */}
+      {/* ⚡ กล่องให้ AI ดึงข้อมูลอาหารเช้าอัตโนมัติ (เช่น กรอก "ข้าวต้มหมู") */}
+      <div className="rounded-3xl bg-white p-4 shadow-ios border border-purple-100">
+        <div className="flex items-center space-x-1.5 text-xs font-bold text-purple-900 mb-2">
+          <Bot className="h-4 w-4 text-purple-600" />
+          <span>พิมพ์ชื่ออาหาร แล้วให้ AI ดึงสารอาหารให้อัตโนมัติ:</span>
+        </div>
+        <form onSubmit={handleQuickAiLookup} className="flex space-x-2">
+          <input
+            type="text"
+            placeholder="เช่น ข้าวต้มหมู, โจ๊กหมู, สุกี้น้ำ, ต้มเลือดหมู..."
+            value={quickAiInput}
+            onChange={(e) => setQuickAiInput(e.target.value)}
+            className="flex-1 rounded-2xl border border-purple-200 bg-purple-50/40 px-3.5 py-2.5 text-xs font-bold text-gray-900 placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:bg-white transition"
+          />
+          <button
+            type="submit"
+            disabled={isQuickAiLoading || !quickAiInput.trim()}
+            className="rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:opacity-95 active:scale-95 transition flex items-center space-x-1.5 disabled:opacity-50 flex-shrink-0"
+          >
+            {isQuickAiLoading ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>กำลังดึงข้อมูล...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                <span>AI ดึงข้อมูล</span>
+              </>
+            )}
+          </button>
+        </form>
+        <p className="mt-1.5 text-[10px] text-gray-400 pl-1">
+          *AI จะคำนวณ Kcal, โปรตีน, คาร์บ, ไขมัน พร้อมบันทึกลงฐานข้อมูล Supabase ทันที
+        </p>
+      </div>
+
+      {/* AI Breakfast Chef Full Mode Button */}
       <div className="rounded-3xl bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 p-4 text-white shadow-md flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md">
@@ -342,7 +430,7 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
             <span className="text-4xl">🔍</span>
             <p className="mt-2 text-sm font-semibold text-gray-700">ไม่พบเมนูที่คุณค้นหา</p>
             <p className="text-xs text-gray-400 mt-1">
-              ลองใช้ปุ่ม &ldquo;เปิด AI Chef&rdquo; ด้านบน เพื่อให้ AI ช่วยคิดเมนูได้เลยครับ!
+              ลองพิมพ์ชื่อในกล่อง &ldquo;AI ดึงข้อมูล&rdquo; ด้านบน เพื่อให้ AI เพิ่มเมนูนี้ลงระบบได้ทันทีครับ!
             </p>
           </div>
         ) : (
@@ -566,6 +654,30 @@ export function BreakfastDirectory({ onMealSelected }: BreakfastDirectoryProps) 
                     placeholder="20"
                     value={customForm.proteinG}
                     onChange={(e) => setCustomForm({ ...customForm, proteinG: e.target.value })}
+                    className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-600">คาร์โบไฮเดรต (g)</label>
+                  <input
+                    type="number"
+                    placeholder="15"
+                    value={customForm.carbsG}
+                    onChange={(e) => setCustomForm({ ...customForm, carbsG: e.target.value })}
+                    className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-gray-600">ไขมัน (g)</label>
+                  <input
+                    type="number"
+                    placeholder="6"
+                    value={customForm.fatG}
+                    onChange={(e) => setCustomForm({ ...customForm, fatG: e.target.value })}
                     className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none focus:border-orange-500"
                   />
                 </div>

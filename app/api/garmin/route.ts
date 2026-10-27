@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     // ดึงโปรไฟล์และสถานะ Garmin
     const { data: profile } = await supabaseAdmin
       .from("user_profiles")
-      .select("garmin_connected, garmin_device, garmin_last_sync, daily_step_goal")
+      .select("age, garmin_connected, garmin_device, garmin_last_sync, daily_step_goal, fitness_age, resting_hr")
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -16,16 +16,19 @@ export async function GET(req: NextRequest) {
     // ดึงก้าวเดินของวันนี้
     const { data: habit } = await supabaseAdmin
       .from("daily_habits")
-      .select("steps")
+      .select("steps, fitness_age, resting_hr")
       .eq("date", todayStr)
       .maybeSingle();
 
     return NextResponse.json({
       connected: profile?.garmin_connected || false,
-      device: profile?.garmin_device || "Garmin Forerunner 265",
+      device: profile?.garmin_device || "Garmin Instinct 2",
       lastSync: profile?.garmin_last_sync || null,
       steps: habit?.steps || 0,
       stepGoal: profile?.daily_step_goal || 10000,
+      actualAge: profile?.age || 28,
+      fitnessAge: habit?.fitness_age || profile?.fitness_age || 24,
+      restingHr: habit?.resting_hr || profile?.resting_hr || 58,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -35,12 +38,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, deviceName, steps, garminEmail } = body;
+    const { action, deviceName, steps, fitnessAge, restingHr } = body;
     const todayStr = new Date().toISOString().split("T")[0];
 
     // 1. เชื่อมต่ออุปกรณ์ Garmin
     if (action === "connect") {
-      const selectedDevice = deviceName || "Garmin Forerunner 265";
+      const selectedDevice = deviceName || "Garmin Instinct 2";
       const now = new Date().toISOString();
 
       await supabaseAdmin
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
           garmin_last_sync: now,
           updated_at: now,
         })
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // update active profile
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
       return NextResponse.json({
         success: true,
@@ -62,25 +65,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ซิงค์ข้อมูลก้าวเดินจาก Garmin เข้า Supabase
+    // 2. ซิงค์ข้อมูลก้าวเดิน และ อายุสุขภาพ (Fitness Age) จาก Garmin Connect เข้า Supabase
     if (action === "sync") {
-      const syncSteps = Number(steps) || Math.floor(Math.random() * 500) + 6500;
+      const syncSteps = Number(steps) || 7450;
+      const syncFitnessAge = fitnessAge !== undefined ? Number(fitnessAge) : 24;
+      const syncRestingHr = restingHr !== undefined ? Number(restingHr) : 58;
       const now = new Date().toISOString();
 
-      // อัปเดต steps ใน daily_habits ของวันนี้
+      // บันทึก steps และ fitness_age ใน daily_habits
       await supabaseAdmin.from("daily_habits").upsert(
         {
           date: todayStr,
           steps: syncSteps,
+          fitness_age: syncFitnessAge,
+          resting_hr: syncRestingHr,
           updated_at: now,
         },
         { onConflict: "date" }
       );
 
-      // อัปเดต last_sync ใน user_profiles
+      // บันทึก fitness_age ใน user_profiles
       await supabaseAdmin
         .from("user_profiles")
         .update({
+          fitness_age: syncFitnessAge,
+          resting_hr: syncRestingHr,
           garmin_last_sync: now,
           updated_at: now,
         })
@@ -88,8 +97,10 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: "ซิงค์ยอดก้าวเดินจาก Garmin สำเร็จแล้ว",
+        message: "ซิงค์ก้าวเดินและอายุสุขภาพจาก Garmin สำเร็จแล้ว",
         steps: syncSteps,
+        fitnessAge: syncFitnessAge,
+        restingHr: syncRestingHr,
         lastSync: now,
       });
     }

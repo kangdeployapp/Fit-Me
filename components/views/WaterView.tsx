@@ -7,12 +7,12 @@ import {
   Minus,
   RotateCcw,
   Sparkles,
-  BellRing,
   Clock,
   CheckCircle,
-  HelpCircle,
+  Database,
 } from "lucide-react";
 import { UserProfile } from "@/types";
+import { supabase } from "@/lib/supabase";
 
 interface WaterLogEntry {
   id: string;
@@ -32,8 +32,7 @@ export function WaterView({ userProfile, waterMl, onWaterChange }: WaterViewProp
     { id: "2", time: "10:30", amountMl: 500 },
     { id: "3", time: "12:45", amountMl: 500 },
   ]);
-  const [isSendingPush, setIsSendingPush] = useState(false);
-  const [pushSentToast, setPushSentToast] = useState(false);
+  const [isSavedToast, setIsSavedToast] = useState(false);
 
   // คำนวณปริมาณน้ำที่เหมาะสมตามน้ำหนักตัว (น้ำหนัก x 33 มล.)
   const recommendedMl = Math.round(userProfile.currentWeightKg * 33);
@@ -41,48 +40,78 @@ export function WaterView({ userProfile, waterMl, onWaterChange }: WaterViewProp
   const percentage = Math.min(100, Math.round((waterMl / targetMl) * 100));
   const remainingMl = Math.max(0, targetMl - waterMl);
 
-  const addWater = (amount: number) => {
+  // ดึงค่าน้ำดื่มจริงของวันนี้จาก Supabase
+  useEffect(() => {
+    const fetchTodayWater = async () => {
+      const todayStr = new Date().toISOString().split("T")[0];
+      try {
+        const { data, error } = await supabase
+          .from("daily_habits")
+          .select("water_ml")
+          .eq("date", todayStr)
+          .maybeSingle();
+
+        if (data && !error && data.water_ml !== undefined && data.water_ml !== null) {
+          onWaterChange(data.water_ml);
+        }
+      } catch (e) {
+        console.warn("Water fetch error:", e);
+      }
+    };
+    fetchTodayWater();
+  }, []);
+
+  const addWater = async (amount: number) => {
     const updated = Math.min(6000, waterMl + amount);
     onWaterChange(updated);
 
     const now = new Date();
     const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
     setLogs((prev) => [{ id: String(Date.now()), time: timeStr, amountMl: amount }, ...prev]);
+
+    // บันทึกลง Supabase จริงทันที
+    const todayStr = new Date().toISOString().split("T")[0];
+    try {
+      await supabase.from("daily_habits").upsert(
+        {
+          date: todayStr,
+          water_ml: updated,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "date" }
+      );
+      setIsSavedToast(true);
+      setTimeout(() => setIsSavedToast(false), 2000);
+    } catch (err) {
+      console.warn("Water save error", err);
+    }
   };
 
-  const resetWater = () => {
+  const resetWater = async () => {
     onWaterChange(0);
     setLogs([]);
-  };
-
-  const handleSendWaterPush = async () => {
-    setIsSendingPush(true);
+    const todayStr = new Date().toISOString().split("T")[0];
     try {
-      const res = await fetch("/api/send-push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "water" }),
-      });
-      if (res.ok) {
-        setPushSentToast(true);
-        setTimeout(() => setPushSentToast(false), 3000);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsSendingPush(false);
+      await supabase.from("daily_habits").upsert(
+        {
+          date: todayStr,
+          water_ml: 0,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "date" }
+      );
+    } catch (err) {
+      console.warn("Water reset error", err);
     }
   };
 
   return (
     <div className="space-y-4">
       {/* Toast Alert */}
-      {pushSentToast && (
-        <div className="rounded-2xl bg-cyan-600 px-4 py-3 text-xs font-semibold text-white shadow-lg flex items-center justify-between animate-fade-in">
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="h-4 w-4" />
-            <span>ส่งแจ้งเตือนเตือนดื่มน้ำไปยัง iPhone สำเร็จแล้ว!</span>
-          </div>
+      {isSavedToast && (
+        <div className="rounded-2xl bg-cyan-600 px-4 py-2.5 text-xs font-semibold text-white shadow-lg flex items-center space-x-1.5 animate-fade-in">
+          <CheckCircle className="h-4 w-4" />
+          <span>บันทึกปริมาณน้ำดื่มลง Supabase สำเร็จแล้ว!</span>
         </div>
       )}
 
@@ -94,7 +123,13 @@ export function WaterView({ userProfile, waterMl, onWaterChange }: WaterViewProp
               <Droplets className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">บันทึกการดื่มน้ำ</h2>
+              <div className="flex items-center space-x-1.5">
+                <h2 className="text-lg font-bold text-gray-900">บันทึกการดื่มน้ำ</h2>
+                <span className="flex items-center space-x-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700 border border-emerald-200">
+                  <Database className="h-2.5 w-2.5 text-emerald-600" />
+                  <span>Sync Supabase</span>
+                </span>
+              </div>
               <p className="text-xs text-gray-500">
                 {remainingMl > 0
                   ? `ดื่มอีก ${remainingMl.toLocaleString()} มล. เพื่อสุขภาพที่ดี`
@@ -168,7 +203,7 @@ export function WaterView({ userProfile, waterMl, onWaterChange }: WaterViewProp
 
         {/* Quick Add Buttons */}
         <div className="mt-6">
-          <span className="text-xs font-semibold text-gray-600 block mb-2">กดเติมน้ำด่วน:</span>
+          <span className="text-xs font-semibold text-gray-600 block mb-2">กดเติมน้ำด่วน (บันทึกลง Supabase ทันที):</span>
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => addWater(250)}
