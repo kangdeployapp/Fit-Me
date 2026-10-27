@@ -55,6 +55,13 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
   const [inputRestingHr, setInputRestingHr] = useState<string>("58");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
+  const [liveOrigin, setLiveOrigin] = useState<string>("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setLiveOrigin(window.location.origin);
+    }
+  }, []);
 
   const weeklyTarget = 70000;
   const dailyTarget = userProfile?.dailyStepGoal || 10000;
@@ -174,7 +181,8 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
   };
 
   const handleCopyWebhookUrl = () => {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://fit-me-kangjaa.vercel.app";
+    const origin = liveOrigin || (typeof window !== "undefined" ? window.location.origin : "");
+    if (!origin) return;
     const webhookUrl = `${origin}/api/garmin`;
     navigator.clipboard.writeText(webhookUrl);
     setCopiedWebhook(true);
@@ -525,11 +533,15 @@ export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) 
                         )}
                       </button>
                     </div>
-                    <code className="text-[10px] bg-white p-2 rounded-xl border border-gray-200 block overflow-x-auto text-purple-800 font-mono">
-                      {typeof window !== "undefined" ? window.location.origin : "https://fit-me-kangjaa.vercel.app"}/api/garmin
+                    <code className="text-[10px] bg-white p-2 rounded-xl border border-gray-200 block overflow-x-auto text-purple-800 font-mono font-bold">
+                      {liveOrigin ? `${liveOrigin}/api/garmin` : "https://<โดเมน-Vercel-ของคุณ>/api/garmin"}
                     </code>
-                    <p className="text-[10px] text-gray-400 mt-1.5">
-                      Payload: <code>{JSON.stringify({ action: "sync", steps: 8500, fitnessAge: 24 })}</code>
+                    <p className="text-[10px] text-gray-500 mt-2 leading-relaxed">
+                      💡 <strong>วิธีตั้งค่าง่ายที่สุด:</strong> ในแอปคำสั่งลัด เลือกคำสั่ง <em>"ดึงเนื้อหาจาก URL"</em> แล้วใส่ URL:
+                      <br />
+                      <code className="text-purple-700 bg-white px-1.5 py-0.5 rounded border border-gray-200 mt-0.5 inline-block">
+                        {liveOrigin ? `${liveOrigin}/api/garmin?steps=` : "https://<โดเมน-Vercel-ของคุณ>/api/garmin?steps="}[จำนวนก้าว]
+                      </code>
                     </p>
                   </div>
                 </div>

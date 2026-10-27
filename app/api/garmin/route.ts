@@ -4,8 +4,49 @@ import { supabaseAdmin } from "@/lib/supabase";
 export async function GET(req: NextRequest) {
   try {
     const todayStr = new Date().toISOString().split("T")[0];
+    const { searchParams } = new URL(req.url);
+    const querySteps = searchParams.get("steps");
+    const queryFitnessAge = searchParams.get("fitnessAge");
+    const queryRestingHr = searchParams.get("restingHr");
 
-    // ดึงโปรไฟล์และสถานะ Garmin
+    // ถ้ามีการส่ง query parameters เช่น ?steps=8500 จาก iOS Shortcuts
+    if (querySteps !== null) {
+      const syncSteps = Number(querySteps) || 0;
+      const syncFitnessAge = queryFitnessAge !== null ? Number(queryFitnessAge) : 24;
+      const syncRestingHr = queryRestingHr !== null ? Number(queryRestingHr) : 58;
+      const now = new Date().toISOString();
+
+      await supabaseAdmin.from("daily_habits").upsert(
+        {
+          date: todayStr,
+          steps: syncSteps,
+          fitness_age: syncFitnessAge,
+          resting_hr: syncRestingHr,
+          updated_at: now,
+        },
+        { onConflict: "date" }
+      );
+
+      await supabaseAdmin
+        .from("user_profiles")
+        .update({
+          fitness_age: syncFitnessAge,
+          resting_hr: syncRestingHr,
+          garmin_last_sync: now,
+          updated_at: now,
+        })
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      return NextResponse.json({
+        success: true,
+        message: `ซิงค์ก้าวเดินจริง ${syncSteps.toLocaleString()} ก้าวจาก iOS Shortcut สำเร็จแล้ว`,
+        steps: syncSteps,
+        fitnessAge: syncFitnessAge,
+        lastSync: now,
+      });
+    }
+
+    // กรณีเรียก GET ปกติ เพื่ออ่านสถานะ
     const { data: profile } = await supabaseAdmin
       .from("user_profiles")
       .select("age, garmin_connected, garmin_device, garmin_last_sync, daily_step_goal, fitness_age, resting_hr")
@@ -26,7 +67,7 @@ export async function GET(req: NextRequest) {
       lastSync: profile?.garmin_last_sync || null,
       steps: habit?.steps || 0,
       stepGoal: profile?.daily_step_goal || 10000,
-      actualAge: profile?.age || 28,
+      actualAge: profile?.age || 39,
       fitnessAge: habit?.fitness_age || profile?.fitness_age || 24,
       restingHr: habit?.resting_hr || profile?.resting_hr || 58,
     });
@@ -37,8 +78,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { action, deviceName, steps, fitnessAge, restingHr } = body;
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      // กรณีส่ง payload ไม่ใช่ json
+      body = {};
+    }
+
+    const action = body.action || (body.steps !== undefined ? "sync" : "connect");
+    const { deviceName, steps, fitnessAge, restingHr } = body;
     const todayStr = new Date().toISOString().split("T")[0];
 
     // 1. เชื่อมต่ออุปกรณ์ Garmin
@@ -65,9 +114,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. ซิงค์ข้อมูลก้าวเดิน และ อายุสุขภาพ (Fitness Age) จาก Garmin Connect เข้า Supabase
-    if (action === "sync") {
-      const syncSteps = Number(steps) || 7450;
+    // 2. ซิงค์ข้อมูลก้าวเดิน และ อายุสุขภาพ (Fitness Age) จาก Garmin Connect / iOS Shortcut
+    if (action === "sync" || steps !== undefined) {
+      const syncSteps = Number(steps) || 0;
       const syncFitnessAge = fitnessAge !== undefined ? Number(fitnessAge) : 24;
       const syncRestingHr = restingHr !== undefined ? Number(restingHr) : 58;
       const now = new Date().toISOString();
