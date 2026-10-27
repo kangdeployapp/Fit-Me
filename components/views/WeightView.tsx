@@ -7,13 +7,14 @@ import { Scale, HeartHandshake } from "lucide-react";
 
 interface WeightViewProps {
   userProfile: UserProfile;
+  onWeightUpdate?: (newWeight: number) => void;
 }
 
-export function WeightView({ userProfile }: WeightViewProps) {
+export function WeightView({ userProfile, onWeightUpdate }: WeightViewProps) {
   return (
     <div className="space-y-4">
       {/* 1. Interactive Weight Tracker & BMI Chart */}
-      <WeightTracker />
+      <WeightTracker userProfile={userProfile} onWeightUpdate={onWeightUpdate} />
 
       {/* 2. Weight Mindset Tip */}
       <div className="rounded-3xl bg-emerald-50 p-4 border border-emerald-100 text-xs text-emerald-900 leading-relaxed">

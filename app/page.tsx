@@ -20,19 +20,26 @@ import { StepsView } from "@/components/views/StepsView";
 import { WeightView } from "@/components/views/WeightView";
 import { UserProfileView } from "@/components/UserProfileView";
 import { UserProfile, BreakfastMeal } from "@/types";
-import { DEFAULT_USER_PROFILE } from "@/lib/supabase";
+import { DEFAULT_USER_PROFILE, supabase } from "@/lib/supabase";
 
 export default function App() {
   const [activeCategory, setActiveCategory] = useState<NavCategory>("dashboard");
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [currentBreakfast, setCurrentBreakfast] = useState<BreakfastMeal | null>(null);
   const [waterMl, setWaterMl] = useState<number>(1500);
-  const [todaySteps, setTodaySteps] = useState<number>(6420);
-  const [currentWeight, setCurrentWeight] = useState<number>(73.0);
+  const [todaySteps, setTodaySteps] = useState<number>(7450);
+  const [currentWeight, setCurrentWeight] = useState<number>(83.0);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // โหลดค่าแคชจาก localStorage
+  // ดึงข้อมูลจริงล่าสุดจาก Supabase ทันทีเมื่อเปิดแอป
   useEffect(() => {
+    fetchLiveSupabaseData();
+  }, []);
+
+  const fetchLiveSupabaseData = async () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // โหลดแคชเร็วจาก localStorage ก่อน
     const prof = localStorage.getItem("fitlife_user_profile");
     if (prof) {
       try {
@@ -49,11 +56,55 @@ export default function App() {
       } catch (e) {}
     }
 
-    const savedWater = localStorage.getItem("fitlife_today_water");
-    if (savedWater) {
-      setWaterMl(Number(savedWater) || 1500);
+    try {
+      // 1. ดึงโปรไฟล์จริงจาก Supabase table `user_profiles`
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (profile) {
+        const loaded: UserProfile = {
+          id: profile.id,
+          nickname: profile.nickname || "Kangjaa",
+          gender: profile.gender || "male",
+          age: profile.age || 39,
+          heightCm: Number(profile.height_cm) || 170,
+          currentWeightKg: Number(profile.current_weight_kg) || 83.0,
+          targetWeightKg: Number(profile.target_weight_kg) || 75.0,
+          activityLevel: profile.activity_level || "moderate",
+          dailyKcalTarget: profile.daily_kcal_target || 2140,
+          dailyWaterMl: profile.daily_water_ml || 2500,
+          dailyStepGoal: profile.daily_step_goal || 10000,
+          garminConnected: profile.garmin_connected,
+          garminDevice: profile.garmin_device || "Garmin Instinct 2",
+          garminLastSync: profile.garmin_last_sync,
+          fitnessAge: profile.fitness_age || 24,
+          restingHr: profile.resting_hr || 58,
+        };
+
+        setUserProfile(loaded);
+        setCurrentWeight(loaded.currentWeightKg);
+        localStorage.setItem("fitlife_user_profile", JSON.stringify(loaded));
+      }
+
+      // 2. ดึงข้อมูลกิจกรรมจริงวันนี้จาก Supabase table `daily_habits`
+      const { data: habit } = await supabase
+        .from("daily_habits")
+        .select("*")
+        .eq("date", todayStr)
+        .maybeSingle();
+
+      if (habit) {
+        if (habit.water_ml !== undefined && habit.water_ml !== null) setWaterMl(habit.water_ml);
+        if (habit.steps) setTodaySteps(habit.steps);
+      }
+    } catch (err) {
+      console.warn("Live Supabase fetch error:", err);
     }
-  }, []);
+  };
 
   const handleWaterChange = (amount: number) => {
     setWaterMl(amount);
@@ -137,14 +188,23 @@ export default function App() {
           />
         )}
 
-        {/* 4. หมวด ก้าวเดิน */}
+        {/* 4. หมวด ก้าวเดิน & Garmin */}
         {activeCategory === "steps" && (
-          <StepsView userProfile={userProfile} />
+          <StepsView
+            userProfile={userProfile}
+            onStepsUpdate={(steps) => setTodaySteps(steps)}
+          />
         )}
 
-        {/* 5. หมวด น้ำหนัก */}
+        {/* 5. หมวด น้ำหนัก & BMI */}
         {activeCategory === "weight" && (
-          <WeightView userProfile={userProfile} />
+          <WeightView
+            userProfile={userProfile}
+            onWeightUpdate={(newW) => {
+              setCurrentWeight(newW);
+              setUserProfile((prev) => ({ ...prev, currentWeightKg: newW }));
+            }}
+          />
         )}
       </main>
 

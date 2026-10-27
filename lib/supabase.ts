@@ -43,17 +43,18 @@ export type DailyHabit = {
 };
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
-  nickname: "คุณคนเก่ง",
+  nickname: "Kangjaa",
   gender: "male",
-  age: 28,
-  heightCm: 172,
-  currentWeightKg: 73.0,
-  targetWeightKg: 68.0,
+  age: 39,
+  heightCm: 170,
+  currentWeightKg: 83.0,
+  targetWeightKg: 75.0,
   activityLevel: "moderate",
-  dailyKcalTarget: 1650,
+  dailyKcalTarget: 2140,
   dailyWaterMl: 2500,
   dailyStepGoal: 10000,
-  garminConnected: false,
-  garminDevice: "Garmin Forerunner 265",
-  fitnessAge: 25,
+  garminConnected: true,
+  garminDevice: "Garmin Instinct 2",
+  fitnessAge: 24,
+  restingHr: 58,
 };

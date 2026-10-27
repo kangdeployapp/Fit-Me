@@ -39,17 +39,38 @@ ChartJS.register(
   Filler
 );
 
-export function WeightTracker() {
-  const [weightInput, setWeightInput] = useState<string>("73.0");
+import { UserProfile } from "@/types";
+
+interface WeightTrackerProps {
+  userProfile?: UserProfile;
+  onWeightUpdate?: (newWeight: number) => void;
+}
+
+export function WeightTracker({ userProfile, onWeightUpdate }: WeightTrackerProps) {
+  const initialWeight = userProfile?.currentWeightKg || 83.0;
+  const initialTarget = userProfile?.targetWeightKg || 75.0;
+  const initialHeight = userProfile?.heightCm || 170;
+
+  const [weightInput, setWeightInput] = useState<string>(String(initialWeight));
   const [noteInput, setNoteInput] = useState<string>("");
-  const [targetWeight, setTargetWeight] = useState<number>(68.0);
-  const [height, setHeight] = useState<number>(172);
-  const [currentWeight, setCurrentWeight] = useState<number>(73.0);
+  const [targetWeight, setTargetWeight] = useState<number>(initialTarget);
+  const [height, setHeight] = useState<number>(initialHeight);
+  const [currentWeight, setCurrentWeight] = useState<number>(initialWeight);
   const [logs, setLogs] = useState<WeightLog[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [showHistory, setShowHistory] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // ซิงค์ค่าเมื่อ props userProfile เปลี่ยน
+  useEffect(() => {
+    if (userProfile?.currentWeightKg) {
+      setCurrentWeight(userProfile.currentWeightKg);
+      setWeightInput(String(userProfile.currentWeightKg));
+    }
+    if (userProfile?.targetWeightKg) setTargetWeight(userProfile.targetWeightKg);
+    if (userProfile?.heightCm) setHeight(userProfile.heightCm);
+  }, [userProfile]);
 
   // 1. โหลดข้อมูลจริงจาก Supabase (user_profiles และ weight_logs)
   useEffect(() => {
@@ -125,6 +146,20 @@ export function WeightTracker() {
           updated_at: new Date().toISOString(),
         })
         .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      // แจ้ง parent component ให้อัปเดต Dashboard ทันที
+      setCurrentWeight(val);
+      if (onWeightUpdate) onWeightUpdate(val);
+
+      // อัปเดต localStorage แคช
+      try {
+        const local = localStorage.getItem("fitlife_user_profile");
+        if (local) {
+          const parsed = JSON.parse(local);
+          parsed.currentWeightKg = val;
+          localStorage.setItem("fitlife_user_profile", JSON.stringify(parsed));
+        }
+      } catch (e) {}
 
       setToastMessage(`บันทึกน้ำหนัก ${val} กก. ลงฐานข้อมูล Supabase สำเร็จแล้ว!`);
       setTimeout(() => setToastMessage(null), 3000);

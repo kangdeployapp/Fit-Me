@@ -5,19 +5,21 @@ import {
   Watch,
   RefreshCw,
   Footprints,
-  BatteryCharging,
   CheckCircle,
   AlertTriangle,
   Link2,
-  Unlink,
   Settings,
   X,
   Heart,
   Sparkles,
   Smartphone,
-  ShieldCheck,
-  TrendingDown,
+  Copy,
+  Check,
+  Activity,
+  ArrowRight,
+  ExternalLink,
 } from "lucide-react";
+import { UserProfile } from "@/types";
 
 const GARMIN_MODELS = [
   "Garmin Instinct 2",
@@ -29,37 +31,62 @@ const GARMIN_MODELS = [
   "Garmin Epix Pro",
 ];
 
-export function GarminModule() {
+interface GarminModuleProps {
+  userProfile?: UserProfile;
+  onStepsUpdate?: (newSteps: number, fitnessAge: number) => void;
+}
+
+export function GarminModule({ userProfile, onStepsUpdate }: GarminModuleProps) {
   const [isConnected, setIsConnected] = useState<boolean>(true);
-  const [deviceName, setDeviceName] = useState<string>("Garmin Instinct 2");
+  const [deviceName, setDeviceName] = useState<string>(
+    userProfile?.garminDevice || "Garmin Instinct 2"
+  );
   const [lastSyncTime, setLastSyncTime] = useState<string>("เมื่อสักครู่");
   const [todaySteps, setTodaySteps] = useState<number>(7450);
-  const [actualAge, setActualAge] = useState<number>(28);
-  const [fitnessAge, setFitnessAge] = useState<number>(24);
-  const [restingHr, setRestingHr] = useState<number>(58);
+  const [actualAge, setActualAge] = useState<number>(userProfile?.age || 39);
+  const [fitnessAge, setFitnessAge] = useState<number>(userProfile?.fitnessAge || 24);
+  const [restingHr, setRestingHr] = useState<number>(userProfile?.restingHr || 58);
 
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [modalTab, setModalTab] = useState<"manual" | "shortcut">("manual");
   const [inputSteps, setInputSteps] = useState<string>("7450");
   const [inputFitnessAge, setInputFitnessAge] = useState<string>("24");
   const [inputRestingHr, setInputRestingHr] = useState<string>("58");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
 
   const weeklyTarget = 70000;
-  const dailyTarget = 10000;
+  const dailyTarget = userProfile?.dailyStepGoal || 10000;
+
+  // ซิงค์ค่าตาม userProfile props เมื่อโหลดเสร็จ
+  useEffect(() => {
+    if (userProfile?.garminDevice) setDeviceName(userProfile.garminDevice);
+    if (userProfile?.age) setActualAge(userProfile.age);
+    if (userProfile?.fitnessAge) {
+      setFitnessAge(userProfile.fitnessAge);
+      setInputFitnessAge(String(userProfile.fitnessAge));
+    }
+    if (userProfile?.restingHr) {
+      setRestingHr(userProfile.restingHr);
+      setInputRestingHr(String(userProfile.restingHr));
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     fetchGarminStatus();
   }, []);
 
+  // ดึงข้อมูลจริงล่าสุดจาก Supabase API โดยไม่เพิ่มค่ามั่ว
   const fetchGarminStatus = async () => {
+    setIsSyncing(true);
     try {
       const res = await fetch("/api/garmin");
       const data = await res.json();
       if (res.ok) {
         setIsConnected(data.connected);
         if (data.device) setDeviceName(data.device);
-        if (data.steps) {
+        if (data.steps !== undefined && data.steps !== null) {
           setTodaySteps(data.steps);
           setInputSteps(String(data.steps));
         }
@@ -81,6 +108,8 @@ export function GarminModule() {
       }
     } catch (e) {
       console.warn("Garmin fetch fallback", e);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -97,7 +126,6 @@ export function GarminModule() {
         setIsConnected(true);
         setDeviceName(selectedModel);
         setLastSyncTime("เพิ่งซิงค์เมื่อสักครู่");
-        setIsModalOpen(false);
       }
     } catch (err) {
       console.error(err);
@@ -106,37 +134,51 @@ export function GarminModule() {
     }
   };
 
-  const handleSyncData = async (manualSteps?: number, manualFitnessAge?: number, manualHr?: number) => {
-    setIsSyncing(true);
-    const stepsToSend = manualSteps !== undefined ? manualSteps : todaySteps + 350;
-    const fitnessAgeToSend = manualFitnessAge !== undefined ? manualFitnessAge : fitnessAge;
-    const restingHrToSend = manualHr !== undefined ? manualHr : restingHr;
+  // ซิงค์ข้อมูลจริง 100% จากแอป Garmin Connect ลง Supabase
+  const handleSaveRealSyncData = async () => {
+    const s = parseInt(inputSteps) || todaySteps;
+    const fa = parseInt(inputFitnessAge) || fitnessAge;
+    const rhr = parseInt(inputRestingHr) || restingHr;
 
+    setIsSyncing(true);
     try {
       const res = await fetch("/api/garmin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "sync",
-          steps: stepsToSend,
-          fitnessAge: fitnessAgeToSend,
-          restingHr: restingHrToSend,
+          steps: s,
+          fitnessAge: fa,
+          restingHr: rhr,
         }),
       });
       const data = await res.json();
       if (res.ok) {
-        setTodaySteps(stepsToSend);
-        setFitnessAge(fitnessAgeToSend);
-        setRestingHr(restingHrToSend);
+        setTodaySteps(s);
+        setFitnessAge(fa);
+        setRestingHr(rhr);
         setLastSyncTime("เพิ่งซิงค์เมื่อสักครู่");
-        setToastMessage("ซิงค์ก้าวเดินและอายุสุขภาพเข้า Supabase สำเร็จแล้ว!");
-        setTimeout(() => setToastMessage(null), 3000);
+        if (onStepsUpdate) onStepsUpdate(s, fa);
+        setToastMessage(`ซิงค์ก้าวเดินจริง ${s.toLocaleString()} ก้าว และอายุสุขภาพ ${fa} ปี ลง Supabase สำเร็จแล้ว!`);
+        setTimeout(() => setToastMessage(null), 3500);
+        setIsModalOpen(false);
+      } else {
+        alert("ซิงค์ไม่สำเร็จ: " + (data.error || "เกิดข้อผิดพลาด"));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleCopyWebhookUrl = () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://fit-me-kangjaa.vercel.app";
+    const webhookUrl = `${origin}/api/garmin`;
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2500);
   };
 
   const ageDiff = actualAge - fitnessAge;
@@ -154,69 +196,68 @@ export function GarminModule() {
         </div>
       )}
 
+      {/* Header & Main Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
             <Watch className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-gray-900">Garmin Connect™</h3>
+            <div className="flex items-center space-x-1.5">
+              <h3 className="text-base font-bold text-gray-900">Garmin Connect™</h3>
+              <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[9px] font-bold">
+                INSTINCT 2
+              </span>
+            </div>
             <p className="text-xs text-gray-500">
-              {isConnected ? deviceName : "ยังไม่ได้เชื่อมต่อ Garmin Connect"}
+              {deviceName} • {lastSyncTime}
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-1.5">
-          {isConnected ? (
-            <>
-              <button
-                onClick={() => handleSyncData()}
-                disabled={isSyncing}
-                className="inline-flex items-center space-x-1 rounded-full bg-purple-50 px-3 py-1.5 text-xs font-bold text-purple-700 hover:bg-purple-100 active:scale-95 transition disabled:opacity-50"
-              >
-                <RefreshCw className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} />
-                <span>{isSyncing ? "กำลังซิงค์..." : "ซิงค์ด่วน"}</span>
-              </button>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                title="ตั้งค่าเชื่อมต่อ Garmin บน iPhone"
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center space-x-1.5 rounded-full bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-purple-700 active:scale-95 transition"
-            >
-              <Link2 className="h-3.5 w-3.5" />
-              <span>เชื่อมต่อ Garmin</span>
-            </button>
-          )}
+          <button
+            onClick={() => fetchGarminStatus()}
+            disabled={isSyncing}
+            className="p-2 rounded-full text-gray-500 hover:bg-gray-100 active:scale-95 transition disabled:opacity-50"
+            title="รีเฟรชข้อมูลล่าสุดจาก Supabase"
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+          </button>
+
+          <button
+            onClick={() => {
+              setInputSteps(String(todaySteps));
+              setInputFitnessAge(String(fitnessAge));
+              setInputRestingHr(String(restingHr));
+              setIsModalOpen(true);
+            }}
+            className="inline-flex items-center space-x-1.5 rounded-full bg-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-purple-700 active:scale-95 transition"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>ซิงค์ข้อมูล Garmin</span>
+          </button>
         </div>
       </div>
 
-      {/* Device Status Bar */}
-      <div className="mt-3.5 flex items-center justify-between rounded-xl bg-gray-50/70 px-3 py-2 text-[11px] text-gray-500 border border-gray-100">
+      {/* Connection Status Pill */}
+      <div className="mt-3.5 flex items-center justify-between rounded-xl bg-purple-50/60 px-3 py-2 text-[11px] text-gray-600 border border-purple-100/60">
         <div className="flex items-center space-x-1.5">
-          <span
-            className={`flex h-2 w-2 rounded-full ${
-              isConnected ? "bg-emerald-500 animate-pulse" : "bg-gray-400"
-            }`}
-          />
-          <span className="font-semibold text-gray-700">
-            {isConnected ? "เชื่อมต่อแอปบน iPhone แล้ว" : "ออฟไลน์"}
+          <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-semibold text-purple-950">
+            ซิงค์กับ iPhone & นาฬิกา Garmin Instinct 2
           </span>
-          <span>• {lastSyncTime}</span>
         </div>
-        {isConnected && (
-          <div className="flex items-center space-x-1 font-semibold text-gray-600">
-            <BatteryCharging className="h-3.5 w-3.5 text-emerald-600" />
-            <span>แบตเตอรี่ 86%</span>
-          </div>
-        )}
+        <button
+          onClick={() => {
+            setModalTab("shortcut");
+            setIsModalOpen(true);
+          }}
+          className="text-purple-700 font-bold hover:underline flex items-center space-x-0.5 text-[10px]"
+        >
+          <span>วิธีซิงค์อัตโนมัติ</span>
+          <ArrowRight className="h-3 w-3" />
+        </button>
       </div>
 
       {/* 2 การ์ดหลัก: ก้าวเดิน (Steps) & อายุสุขภาพ (Fitness Age) */}
@@ -231,7 +272,7 @@ export function GarminModule() {
             <span className="text-2xl font-black tracking-tight text-gray-900">
               {todaySteps.toLocaleString()}
             </span>
-            <span className="text-xs text-gray-500">/ 10,000</span>
+            <span className="text-xs text-gray-500">/ {dailyTarget.toLocaleString()}</span>
           </div>
           <div className="mt-2 h-1.5 w-full rounded-full bg-purple-100 overflow-hidden">
             <div
@@ -266,14 +307,41 @@ export function GarminModule() {
         </div>
       </div>
 
+      {/* สรุปก้าวเดินสะสมรายสัปดาห์ & ส่วนต่างที่ขาด */}
+      <div className="mt-4 rounded-2xl bg-gray-50 p-3.5 border border-gray-100">
+        <div className="flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-1 font-bold text-gray-700">
+            <Activity className="h-4 w-4 text-purple-600" />
+            <span>เป้าหมายก้าวเดินสะสม 7 วัน (70,000 ก้าว)</span>
+          </div>
+          <span className="font-extrabold text-purple-700">{weeklyProgress}%</span>
+        </div>
+        <div className="mt-2 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-600 transition-all duration-500"
+            style={{ width: `${weeklyProgress}%` }}
+          />
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500">
+          <span>สะสมแล้ว {weeklyAccumulated.toLocaleString()} ก้าว</span>
+          {weeklyDeficit > 0 ? (
+            <span className="font-semibold text-rose-600">
+              ขาดอีก {weeklyDeficit.toLocaleString()} ก้าว
+            </span>
+          ) : (
+            <span className="font-bold text-emerald-600">ทะลุเป้าหมายแล้ว! 🎉</span>
+          )}
+        </div>
+      </div>
+
       {/* Garmin Connect iPhone Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-6">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in slide-in-from-bottom-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center space-x-2">
                 <Watch className="h-5 w-5 text-purple-600" />
-                <h3 className="text-base font-bold text-gray-900">ซิงค์ Garmin Connect บน iPhone</h3>
+                <h3 className="text-base font-bold text-gray-900">ซิงค์ Garmin Connect จริง</h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -283,69 +351,197 @@ export function GarminModule() {
               </button>
             </div>
 
-            <div className="mt-4 space-y-4">
-              {/* เลือกรุ่น Garmin */}
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1.5">
-                  รุ่นอุปกรณ์ Garmin ของคุณ:
-                </label>
-                <select
-                  value={deviceName}
-                  onChange={(e) => handleConnect(e.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-xs font-bold text-gray-900 focus:outline-none focus:border-purple-500"
-                >
-                  {GARMIN_MODELS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Modal Tabs */}
+            <div className="mt-4 flex rounded-xl bg-gray-100 p-1">
+              <button
+                onClick={() => setModalTab("manual")}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  modalTab === "manual"
+                    ? "bg-white text-purple-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                📱 ซิงค์ข้อมูลจริง (ทันที)
+              </button>
+              <button
+                onClick={() => setModalTab("shortcut")}
+                className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  modalTab === "shortcut"
+                    ? "bg-white text-purple-700 shadow-sm"
+                    : "text-gray-500 hover:text-gray-900"
+                }`}
+              >
+                ⚡ ซิงค์อัตโนมัติ (Apple Health)
+              </button>
+            </div>
 
-              {/* ซิงค์ข้อมูลจากแอป Garmin Connect */}
-              <div className="rounded-2xl bg-purple-50/60 p-4 border border-purple-100 space-y-3">
-                <div className="flex items-center justify-between text-xs font-bold text-purple-950">
-                  <span>ข้อมูลจากแอป Garmin Connect บน iPhone:</span>
-                  <Smartphone className="h-4 w-4 text-purple-600" />
+            {modalTab === "manual" ? (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-2xl bg-purple-50/70 p-3.5 border border-purple-100 text-xs text-purple-950 leading-relaxed">
+                  <p className="font-semibold">
+                    💡 เปิดแอป <strong>Garmin Connect</strong> บน iPhone ดูค่าจริงจากนาฬิกา <strong>{deviceName}</strong> แล้วกดบันทึกเพื่อซิงค์เข้าฐานข้อมูล Supabase ได้ทันทีครับ:
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] font-semibold text-gray-600 block">
-                      ก้าวเดินวันนี้ (Steps):
-                    </label>
-                    <input
-                      type="number"
-                      value={inputSteps}
-                      onChange={(e) => setInputSteps(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-900"
-                    />
-                  </div>
+                {/* Input 1: ก้าวเดิน */}
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">
+                    🚶‍♂️ ก้าวเดินวันนี้ (Today's Steps):
+                  </label>
+                  <input
+                    type="number"
+                    value={inputSteps}
+                    onChange={(e) => setInputSteps(e.target.value)}
+                    placeholder="เช่น 7450"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-bold text-gray-900 focus:outline-none focus:border-purple-500 focus:bg-white"
+                  />
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">
+                    ดูได้จากหน้า "วันของฉัน (My Day)" ในแอป Garmin Connect
+                  </span>
+                </div>
 
+                {/* Input 2: อายุสุขภาพ */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-gray-600 block">
-                      อายุสุขภาพ (Fitness Age):
+                    <label className="text-xs font-bold text-gray-700 block mb-1">
+                      ✨ อายุสุขภาพ (Fitness Age):
                     </label>
                     <input
                       type="number"
                       value={inputFitnessAge}
                       onChange={(e) => setInputFitnessAge(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-xs font-bold text-gray-900"
+                      placeholder="เช่น 24"
+                      className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-bold text-gray-900 focus:outline-none focus:border-purple-500 focus:bg-white"
                     />
+                    <span className="text-[10px] text-gray-400 mt-0.5 block">
+                      ดูใน สถิติสุขภาพ &gt; อายุสุขภาพ
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-gray-700 block mb-1">
+                      ❤️ หัวใจขณะพัก (Resting HR):
+                    </label>
+                    <input
+                      type="number"
+                      value={inputRestingHr}
+                      onChange={(e) => setInputRestingHr(e.target.value)}
+                      placeholder="เช่น 58"
+                      className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-bold text-gray-900 focus:outline-none focus:border-purple-500 focus:bg-white"
+                    />
+                    <span className="text-[10px] text-gray-400 mt-0.5 block">
+                      bpm
+                    </span>
+                  </div>
+                </div>
+
+                {/* อุปกรณ์ Garmin ที่เชื่อมต่อ */}
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1">
+                    ⌚ อุปกรณ์ของคุณ:
+                  </label>
+                  <select
+                    value={deviceName}
+                    onChange={(e) => {
+                      setDeviceName(e.target.value);
+                      handleConnect(e.target.value);
+                    }}
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-900 focus:outline-none"
+                  >
+                    {GARMIN_MODELS.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleSaveRealSyncData}
+                  disabled={isSyncing}
+                  className="w-full rounded-2xl bg-purple-600 py-3 text-xs font-bold text-white shadow-md hover:bg-purple-700 active:scale-95 transition disabled:opacity-50 flex items-center justify-center space-x-1.5"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  <span>{isSyncing ? "กำลังบันทึกลง Supabase..." : "บันทึกซิงค์ข้อมูลจริง 100%"}</span>
+                </button>
+              </div>
+            ) : (
+              /* Tab 2: Apple Health & Shortcuts Guide */
+              <div className="mt-4 space-y-4 text-xs text-gray-700">
+                <div className="rounded-2xl bg-blue-50/80 p-3.5 border border-blue-100 text-blue-950">
+                  <h4 className="font-bold flex items-center space-x-1 mb-1">
+                    <Smartphone className="h-4 w-4 text-blue-600" />
+                    <span>ทำไมต้องผ่าน Apple Health บน iPhone?</span>
+                  </h4>
+                  <p className="text-[11px] leading-relaxed">
+                    เนื่องจากระบบความปลอดภัยของ iOS บน iPhone ไม่อนุญาตให้เบราว์เซอร์หรือเว็บแอปคุยกับบลูทูธของนาฬิกาโดยตรง ทางการทำงานจริงของ Garmin บน iPhone คือ:
+                    <br />
+                    <strong>Garmin Instinct 2 → แอป Garmin Connect → Apple Health (สุขภาพ)</strong>
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-start space-x-2.5">
+                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 font-bold text-[10px]">
+                      1
+                    </span>
+                    <div>
+                      <p className="font-bold text-gray-900">เปิดการเชื่อมต่อ Apple Health ใน Garmin Connect</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        ในแอป Garmin Connect บน iPhone ไปที่ <em>เพิ่มเติม (More) &gt; การตั้งค่า (Settings) &gt; แอปที่เชื่อมต่อ (Connected Apps) &gt; Apple Health</em> และเปิดสิทธิ์อ่าน/เขียน "จำนวนก้าว"
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-2.5">
+                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700 font-bold text-[10px]">
+                      2
+                    </span>
+                    <div>
+                      <p className="font-bold text-gray-900">ส่งข้อมูลอัตโนมัติด้วยคำสั่งลัด (Shortcuts)</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        ในแอป "คำสั่งลัด" (Shortcuts) บน iPhone สร้างคำสั่งลัดตั้งเวลาทำงานทุกวัน (เช่น 20:00 น.) สั่งให้ <strong>"ดึงจำนวนก้าวจากแอปสุขภาพ"</strong> แล้วยิง POST มาที่ Webhook ด้านล่าง
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gray-50 p-3 border border-gray-200">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-bold text-[11px] text-gray-600">FitLife Webhook URL:</span>
+                      <button
+                        onClick={handleCopyWebhookUrl}
+                        className="flex items-center space-x-1 text-purple-600 font-bold text-[11px] hover:underline"
+                      >
+                        {copiedWebhook ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-600" />
+                            <span className="text-emerald-600">คัดลอกแล้ว!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>คัดลอก URL</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <code className="text-[10px] bg-white p-2 rounded-xl border border-gray-200 block overflow-x-auto text-purple-800 font-mono">
+                      {typeof window !== "undefined" ? window.location.origin : "https://fit-me-kangjaa.vercel.app"}/api/garmin
+                    </code>
+                    <p className="text-[10px] text-gray-400 mt-1.5">
+                      Payload: <code>{JSON.stringify({ action: "sync", steps: 8500, fitnessAge: 24 })}</code>
+                    </p>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => {
-                    handleSyncData(Number(inputSteps), Number(inputFitnessAge), Number(inputRestingHr));
-                    setIsModalOpen(false);
-                  }}
-                  className="w-full rounded-2xl bg-purple-600 py-2.5 text-xs font-bold text-white shadow hover:bg-purple-700 active:scale-95 transition"
+                  onClick={() => setModalTab("manual")}
+                  className="w-full rounded-2xl bg-gray-100 py-2.5 text-xs font-bold text-gray-700 hover:bg-gray-200 transition"
                 >
-                  ซิงค์ข้อมูลเข้าสู่ Supabase ทันที
+                  กลับไปหน้าซิงค์ข้อมูลจริง
                 </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

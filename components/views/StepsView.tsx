@@ -15,9 +15,10 @@ import { UserProfile } from "@/types";
 
 interface StepsViewProps {
   userProfile: UserProfile;
+  onStepsUpdate?: (newSteps: number) => void;
 }
 
-export function StepsView({ userProfile }: StepsViewProps) {
+export function StepsView({ userProfile, onStepsUpdate }: StepsViewProps) {
   const [isSendingPush, setIsSendingPush] = useState(false);
   const [pushSentToast, setPushSentToast] = useState(false);
 
@@ -53,7 +54,7 @@ export function StepsView({ userProfile }: StepsViewProps) {
       )}
 
       {/* 1. Garmin Connect Module & Weekly Step Deficit */}
-      <GarminModule />
+      <GarminModule userProfile={userProfile} onStepsUpdate={onStepsUpdate} />
 
       {/* 2. Walking Countdown Timer */}
       <WalkTimer />
